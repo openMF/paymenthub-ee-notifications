@@ -1,0 +1,68 @@
+package org.mifos.connector.notification.template;
+
+import org.apache.velocity.Template;
+import org.apache.velocity.VelocityContext;
+import org.apache.velocity.app.VelocityEngine;
+import org.apache.velocity.runtime.RuntimeConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+
+
+
+@Configuration
+public class TemplateConfig{
+
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(TemplateConfig.class);
+
+    static VelocityEngine vc = new VelocityEngine();
+
+
+    static {
+        /** Initialisation velocity */
+        vc.setProperty(RuntimeConstants.RESOURCE_LOADER, "class,file");
+        vc.setProperty(RuntimeConstants.RUNTIME_LOG_LOGSYSTEM_CLASS, "org.apache.velocity.runtime.log.Log4JLogChute");
+        vc.setProperty("runtime.log.logsystem.log4j.logger", "VELLOGGER");
+        vc.setProperty("class.resource.loader.class", "org.apache.velocity.runtime.resource.loader.ClasspathResourceLoader");
+        vc.setProperty("runtime.log.logsystem.class", "org.apache.velocity.runtime.log.NullLogSystem");
+        try {
+            vc.init();
+        } catch (Exception e) {
+            LOGGER.error("Could not initialise the Velocity engine, the templates will not load", e);
+        }
+    }
+
+
+    @Bean
+    public Template getSMSFailureTemplate() throws Exception {
+        Template t = vc.getTemplate("/sms_failure.vm");
+        return t;
+    }
+    @Bean
+    public Template getSMSSuccessTemplate() throws Exception {
+        Template t = vc.getTemplate("/sms_success.vm");
+        return t;
+    }
+
+    @Bean
+    public Template getEmailFailureTemplate() throws Exception {
+        Template t = vc.getTemplate("/email_failure.vm");
+        return t;
+    }
+    @Bean
+    public Template getEmailSuccessTemplate() throws Exception {
+        Template t = vc.getTemplate("/email_success.vm");
+        return t;
+    }
+    @Bean
+    public VelocityContext getVelocityContext(){
+        VelocityContext vc = new VelocityContext();
+        return vc;
+    }
+
+
+
+}

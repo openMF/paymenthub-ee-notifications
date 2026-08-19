@@ -1,0 +1,148 @@
+# One application, two halves: the notification connector (org.mifos.connector.notification)
+# and the message gateway (org.fineract.messagegateway). Keys that used to live in two
+# files are merged here; where the two disagreed, the value that keeps the deployed
+# behaviour is the one kept, and the choice is noted.
+
+# The gateway's HTTP API (/sms, /smsbridges, /tenants) and the actuator.
+server:
+  port: 9191
+
+spring:
+  jpa:
+    show-sql: false
+    generate-ddl: false
+    hibernate:
+      ddl-auto: none
+  datasource:
+    url: jdbc:mysql://operations-mysql:3306/messagegateway
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:password}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+camel:
+  springboot:
+    main-run-controller: true
+    stream-caching-enabled: true
+    tracing: false
+    message-history: false
+  # The REST settings used to be applied in code, from a CamelContextConfiguration
+  # hook. That hook only runs before the context starts if nothing has already
+  # started it — and the gateway half injects CamelContext into a @Component, which
+  # starts it first. The hook then ran too late, no REST component was set, and
+  # every route failed with "Multiple RestConsumerFactory found on classpath"
+  # (camel-jetty, camel-undertow and camel-http are all on it). As properties the
+  # same settings are applied while the context is being configured, so the order
+  # no longer matters.
+  #
+  # One process means one Camel context and one REST port. 5000 is the connector's
+  # port, the one its routes have always answered on; the gateway declared 5009 but
+  # has no Camel routes at all, so nothing was ever listening there.
+  rest:
+    component: undertow
+    producer-component: undertow
+    scheme: http
+    port: 5000
+    binding-mode: json
+    data-format-properties:
+      prettyPrint: "true"
+  dataformat:
+    jackson:
+      auto-discover-object-mapper: true
+
+zeebe:
+  client:
+    max-execution-threads: 100
+    number-of-workers: 5
+    evenly-allocated-max-jobs: "#{${zeebe.client.max-execution-threads} / ${zeebe.client.number-of-workers}}"
+    ttl: 30000
+    security:
+      plaintext: true
+  broker:
+    contactpoint: "zeebe-zeebe-gateway:26500"
+  worker:
+    timer: "PT15S"
+    retries: 3
+
+hostconfig:
+  host: localhost
+  protocol: http
+
+callbackconfig:
+  host: 0.0.0.0
+  protocol: http
+  port: 5000
+
+# The connector reaches the gateway at its own HTTP port. Same process now, so this
+# is a loopback call and no longer depends on a Kubernetes Service.
+messagegatewayconfig:
+  host: 127.0.0.1
+  protocol: http
+  port: 9191
+
+application:
+  version: 1.0.0
+
+providerSource:
+  fromdatabase: disabled
+  fromyml: enabled
+
+providerKeys:
+  telerivetApiKey: eKiC1_JWdKy7eaTGQFHxXXjXjacr60W9Zntl
+  telerivetProjectId: PJ5ff552ce01d2978c
+
+# provider.enabled / provider.id are read by the gateway; provider.telerivet and
+# provider.rapidpro by the connector. Different keys, so both halves keep their own.
+provider:
+  enabled: true
+  id: 2
+  telerivet:
+    enabled: true
+    id: 2
+  rapidpro:
+    enabled: false
+    id: 3
+
+operationsconfig:
+  tenantid: "Fineract-Platform-TenantId"
+  tenantidvalue : "default"
+  tenantappkey: "Fineract-Tenant-App-Key"
+  tenantappvalue: "123456543234abdkdkdkd"
+
+velocity:
+  transactionid: transactionid
+  amount: amount
+  date: date
+  account: account
+  failure_type: failType
+  txnType: txnType
+  currency: currency
+  defaults:
+    transactionid: "123456789"
+    amount: "100"
+    account: "1234567890"
+    failure_type: "Reason not available"
+    txnType: "transfer"
+    currency: "USD"
+
+notifications:
+  local:
+    host: 0.0.0.0:5000
+  sucess:
+    enabled: false
+  failure:
+    enabled: false
+
+management:
+  endpoint:
+    health:
+      enabled: true
+      probes:
+        enabled: true
+      liveness:
+        enabled: true
+      readiness:
+        enabled: true
+
+logging:
+  level:
+    root: INFO
