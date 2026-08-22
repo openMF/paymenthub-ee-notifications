@@ -1,0 +1,15 @@
+# The context test starts both halves, so the gateway needs a datasource. H2 in
+# MySQL mode stands in: Flyway is off and the schema is created from the entities,
+# which is enough to prove the application context comes up.
+spring:
+  datasource:
+    url: jdbc:h2:mem:messagegateway;MODE=MySQL;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    database-platform: org.hibernate.dialect.H2Dialect
+  flyway:
+    enabled: false
