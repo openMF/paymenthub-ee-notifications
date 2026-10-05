@@ -6,8 +6,6 @@ import org.apache.camel.support.DefaultExchange;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -23,8 +21,6 @@ public class MessageCreationDto {
 
     @Autowired
     private CamelContext camelContext;
-
-    DateFormat df = new SimpleDateFormat("dd:MM:yy:HH:mm:ss");
 
     public Exchange setPropertiesForMessage(Map<String, Object> variables){
         String transactionId = (String) variables.get(TRANSACTION_ID);

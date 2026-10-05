@@ -13,6 +13,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.mifos.connector.notification.config.properties.MessageGatewayConfigProperties;
+import org.mifos.connector.notification.config.properties.OperationsConfigProperties;
+import org.mifos.connector.notification.config.properties.ZeebeProperties;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -25,36 +28,23 @@ import static org.mifos.connector.notification.zeebe.ZeebeVariables.*;
 @Component
 public class DeliveryCallbackRoute extends RouteBuilder{
 
-    private Logger logger = LoggerFactory.getLogger(this.getClass());
+    private final OperationsConfigProperties operationsConfig;
 
-    @Value("${zeebe.client.ttl}")
-    private int timeToLive;
+    private final MessageGatewayConfigProperties messageGatewayConfig;
+
+    private final ZeebeProperties zeebeProperties;
+
+    public DeliveryCallbackRoute(OperationsConfigProperties operationsConfig, MessageGatewayConfigProperties messageGatewayConfig,
+            ZeebeProperties zeebeProperties) {
+        this.operationsConfig = operationsConfig;
+        this.messageGatewayConfig = messageGatewayConfig;
+        this.zeebeProperties = zeebeProperties;
+    }
+
+    private Logger logger = LoggerFactory.getLogger(this.getClass());
 
     @Autowired
     private ZeebeClient zeebeClient;
-
-    @Value("${messagegatewayconfig.protocol}")
-    private String protocol;
-
-    @Value("${messagegatewayconfig.host}")
-    private String address;
-
-    @Value("${messagegatewayconfig.port}")
-    private int port;
-
-    @Value("${operationsconfig.tenantid}")
-    private String tenantId;
-
-    @Value("${operationsconfig.tenantidvalue}")
-    private String tenantIdValue;
-
-    @Value("${operationsconfig.tenantappkey}")
-    private String tenantAppKey;
-
-    @Value("${operationsconfig.tenantappvalue}")
-    private String tenantAppKeyValue;
-
-
 
     @Override
     public void configure() throws Exception {
@@ -63,8 +53,8 @@ public class DeliveryCallbackRoute extends RouteBuilder{
                     .choice()
                     .when(exchange -> Integer.parseInt(exchange.getProperty(RETRY_COUNT_CALLBACK).toString()) < 3)
                     .log(LoggingLevel.INFO, "Calling delivery status API")
-                    .setHeader(tenantId, constant(tenantIdValue))
-                    .setHeader(tenantAppKey, constant(tenantAppKeyValue))
+                    .setHeader(operationsConfig.tenantid(), constant(operationsConfig.tenantidvalue()))
+                    .setHeader(operationsConfig.tenantappkey(), constant(operationsConfig.tenantappvalue()))
                     .setBody(exchange -> {
                         JSONArray request = new JSONArray();
                         Long internalId = Long.parseLong(exchange.getProperty(INTERNAL_ID).toString());
@@ -74,7 +64,7 @@ public class DeliveryCallbackRoute extends RouteBuilder{
                     .log("${body}")
                     .setHeader(Exchange.HTTP_METHOD, simple("POST"))
                     .setHeader(Exchange.CONTENT_TYPE, constant("application/json"))
-                    .to(String.format("%s://%s/sms/report/?bridgeEndpoint=true", protocol, address))
+                    .to(String.format("%s://%s/sms/report/?bridgeEndpoint=true", messageGatewayConfig.protocol(), messageGatewayConfig.host()))
                     .log(LoggingLevel.INFO, "Delivery Status Endpoint Received")
                     .process(exchange -> {
                         String id = exchange.getProperty(CORRELATION_ID, String.class);
@@ -109,7 +99,7 @@ public class DeliveryCallbackRoute extends RouteBuilder{
                                         .messageName(CALLBACK_MESSAGE)
                                         .correlationKey(id)
                                         .variables(newVariables)
-                                        .timeToLive(Duration.ofMillis(timeToLive))
+                                        .timeToLive(Duration.ofMillis(zeebeProperties.client().ttl()))
                                         .send()
                                         .join();
                             } else if (exchange.getProperty(MESSAGE_DELIVERY_STATUS).equals(false)) {
@@ -120,7 +110,7 @@ public class DeliveryCallbackRoute extends RouteBuilder{
                                         .messageName(CALLBACK_MESSAGE)
                                         .correlationKey(id)
                                         .variables(newVariables)
-                                        .timeToLive(Duration.ofMillis(timeToLive))
+                                        .timeToLive(Duration.ofMillis(zeebeProperties.client().ttl()))
                                         .send()
                                         .join();
                             }
@@ -152,7 +142,7 @@ public class DeliveryCallbackRoute extends RouteBuilder{
                         zeebeClient.newPublishMessageCommand()
                                 .messageName(CALLBACK_MESSAGE)
                                 .correlationKey(id)
-                                .timeToLive(Duration.ofMillis(timeToLive))
+                                .timeToLive(Duration.ofMillis(zeebeProperties.client().ttl()))
                                 .variables(newVariables)
                                 .send()
                                 .join();
@@ -202,7 +192,7 @@ public class DeliveryCallbackRoute extends RouteBuilder{
                                     .messageName(CALLBACK_MESSAGE)
                                     .correlationKey(id)
                                     .variables(newVariables)
-                                    .timeToLive(Duration.ofMillis(timeToLive))
+                                    .timeToLive(Duration.ofMillis(zeebeProperties.client().ttl()))
                                     .send()
                                     .join();
                         } else if (exchange.getProperty(MESSAGE_DELIVERY_STATUS).equals(false)) {
@@ -213,7 +203,7 @@ public class DeliveryCallbackRoute extends RouteBuilder{
                                     .messageName(CALLBACK_MESSAGE)
                                     .correlationKey(id)
                                     .variables(newVariables)
-                                    .timeToLive(Duration.ofMillis(timeToLive))
+                                    .timeToLive(Duration.ofMillis(zeebeProperties.client().ttl()))
                                     .send()
                                     .join();
                         }

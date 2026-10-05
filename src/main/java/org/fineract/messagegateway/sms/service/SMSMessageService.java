@@ -29,6 +29,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import javax.sql.DataSource;
 
 import org.fineract.messagegateway.service.SecurityService;
@@ -82,8 +83,34 @@ public class SMSMessageService {
 		executorService = Executors.newSingleThreadExecutor();
 		scheduledExecutorService = Executors.newSingleThreadScheduledExecutor() ;
 		scheduledExecutorService.schedule(new BootupPendingMessagesTask(this.smsOutboundMessageRepository, this.smsProviderFactory) , 1, TimeUnit.MINUTES) ;
-		//When do I have to shutdown  scheduledExecutorService ? :-( as it is no use after triggering BootupPendingMessagesTask
-		//Shutdown scheduledExecutorService on application close event
+	}
+
+	/**
+	 * Answers the question the previous author left in a comment here: both executors are created in
+	 * init() and neither was ever closed, so their threads outlived the application context and, being
+	 * non-daemon, could hold the JVM open on shutdown.
+	 */
+	@PreDestroy
+	public void shutdown() {
+		logger.debug("Shutting down OutboundMessages Service.....");
+		shutdown(this.scheduledExecutorService, "scheduledExecutorService") ;
+		shutdown(this.executorService, "executorService") ;
+	}
+
+	private void shutdown(final ExecutorService service, final String name) {
+		if (service == null) {
+			return ;
+		}
+		service.shutdown() ;
+		try {
+			if (!service.awaitTermination(10, TimeUnit.SECONDS)) {
+				logger.warn("{} did not finish in 10 seconds, stopping it anyway", name) ;
+				service.shutdownNow() ;
+			}
+		} catch (InterruptedException e) {
+			service.shutdownNow() ;
+			Thread.currentThread().interrupt() ;
+		}
 	}
 
 	public void sendShortMessage(final String tenantId, final String tenantAppKey, final Collection<OutboundMessages> messages) {

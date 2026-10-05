@@ -53,12 +53,6 @@ public class SecurityService {
     	return tenant ;
     }
 
-    /*public void verifyApiKey(final String apiKey, final String tenantId) {
-        final SMSBridgeConfig smsBridgeConfigList = this.smsBridgeRepository.findByApiKey(apiKey);
-        if (smsBridgeConfigList == null || !smsBridgeConfigList.getTenantId().equals(tenantId)) {
-            throw new InvalidApiKeyException(apiKey);
-        }
-    }*/
 
     public String generateApiKey(final SMSBridge smsBridge) {
         try {

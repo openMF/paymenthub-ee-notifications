@@ -13,12 +13,28 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.mifos.connector.notification.config.properties.MessageGatewayConfigProperties;
+import org.mifos.connector.notification.config.properties.OperationsConfigProperties;
+import org.mifos.connector.notification.config.properties.ZeebeProperties;
 import org.springframework.stereotype.Component;
 
 import static org.mifos.connector.notification.camel.config.CamelProperties.*;
 
 @Component
 public class SendMessageRoute extends RouteBuilder {
+
+    private final OperationsConfigProperties operationsConfig;
+
+    private final MessageGatewayConfigProperties messageGatewayConfig;
+
+    private final ZeebeProperties zeebeProperties;
+
+    public SendMessageRoute(OperationsConfigProperties operationsConfig, MessageGatewayConfigProperties messageGatewayConfig,
+            ZeebeProperties zeebeProperties) {
+        this.operationsConfig = operationsConfig;
+        this.messageGatewayConfig = messageGatewayConfig;
+        this.zeebeProperties = zeebeProperties;
+    }
 
     private Logger logger = LoggerFactory.getLogger(this.getClass());
 
@@ -34,32 +50,6 @@ public class SendMessageRoute extends RouteBuilder {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @Value("${zeebe.client.ttl}")
-    private int timeToLive;
-
-    @Value("${messagegatewayconfig.protocol}")
-    private String protocol;
-
-    @Value("${messagegatewayconfig.host}")
-    private String address;
-
-    @Value("${messagegatewayconfig.port}")
-    private int port;
-
-    @Value("${operationsconfig.tenantid}")
-    private String tenantId;
-
-    @Value("${operationsconfig.tenantidvalue}")
-    private String tenantIdValue;
-
-    @Value("${operationsconfig.tenantappkey}")
-    private String tenantAppKey;
-
-    @Value("${operationsconfig.tenantappvalue}")
-    private String tenantAppKeyValue;
-
-
-
     @Override
         public void configure() throws Exception {
 
@@ -67,8 +57,8 @@ public class SendMessageRoute extends RouteBuilder {
             from("direct:send-notifications")
                     .id("send-notifications")
                     .log(LoggingLevel.INFO, "Sending success for ${exchangeProperty."+PROVIDER_ID+"}")
-                    .setHeader(tenantId, constant(tenantIdValue))
-                    .setHeader(tenantAppKey, constant(tenantAppKeyValue))
+                    .setHeader(operationsConfig.tenantid(), constant(operationsConfig.tenantidvalue()))
+                    .setHeader(operationsConfig.tenantappkey(), constant(operationsConfig.tenantappvalue()))
                     .process(exchange ->{
                         String mobile = exchange.getProperty(MOBILE_NUMBER).toString();
                         Long internalId = Long.parseLong(exchange.getProperty(INTERNAL_ID).toString());
@@ -85,7 +75,7 @@ public class SendMessageRoute extends RouteBuilder {
                     .log("${body}")
                     .setHeader(Exchange.HTTP_METHOD, simple("POST"))
                     .setHeader(Exchange.CONTENT_TYPE, constant("application/json"))
-                    .to(String.format("%s://%s/sms/?bridgeEndpoint=true", protocol, address))
+                    .to(String.format("%s://%s/sms/?bridgeEndpoint=true", messageGatewayConfig.protocol(), messageGatewayConfig.host()))
                     .log(LoggingLevel.INFO, "Sending sms to message gateway completed")
                    ;
 

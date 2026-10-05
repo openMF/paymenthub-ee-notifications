@@ -156,7 +156,7 @@ public class TelerivetMessageProvider extends Provider {
             logger.debug("Value updated");
 
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.error("failed to read the delivery status from Telerivet", e);
         }
     }
 

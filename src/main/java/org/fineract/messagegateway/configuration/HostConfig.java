@@ -19,26 +19,27 @@
 package org.fineract.messagegateway.configuration;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.mifos.connector.notification.config.properties.HostConfigProperties;
 import org.springframework.stereotype.Service;
 
 @Service
 public class HostConfig {
 
-	@Value("${hostconfig.host}")
-	private String hostName ;
-	
-	@Value("${hostconfig.protocol}")
-	private String protocol ;
+	private final HostConfigProperties properties ;
 	
 	@Value("${server.port}")
 	private Integer port ;
 	
+    public HostConfig(final HostConfigProperties properties) {
+    	this.properties = properties ;
+    }
+
     public String getHostName() {
-    	return this.hostName ;
+    	return this.properties.host() ;
     }
     
     public String getProtocol() {
-    	return this.protocol ;
+    	return this.properties.protocol() ;
     }
 
     public Integer getPort() {

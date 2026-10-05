@@ -19,6 +19,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
+import org.mifos.connector.notification.config.properties.OperationsConfigProperties;
+import org.mifos.connector.notification.config.properties.ZeebeProperties;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.PostConstruct;
@@ -31,6 +33,15 @@ import static org.fineract.messagegateway.zeebe.ZeebeVariables.*;
 
 @Component("messageGatewayZeebeWorkers")
 public class ZeebeWorkers {
+
+    private final ZeebeProperties zeebeProperties;
+
+    private final OperationsConfigProperties operationsConfig;
+
+    public ZeebeWorkers(ZeebeProperties zeebeProperties, OperationsConfigProperties operationsConfig) {
+        this.zeebeProperties = zeebeProperties;
+        this.operationsConfig = operationsConfig;
+    }
     private Logger logger = LoggerFactory.getLogger(this.getClass());
     @Autowired
     private CamelContext camelContext;
@@ -46,20 +57,6 @@ public class ZeebeWorkers {
 
     @Autowired
     private ProviderConfig providerConfig;
-
-    @Value("${zeebe.worker.retries}")
-    private Integer retries;
-
-    @Value("${zeebe.worker.timer}")
-    private String timer;
-    @Value("${zeebe.client.ttl}")
-    private int timeToLive;
-
-    @Value("${operationsconfig.tenantidvalue}")
-    private String tenantIdValue;
-    @Value("${operationsconfig.tenantappvalue}")
-    private String tenantAppKeyValue;
-
 
     @PostConstruct
     public void setupWorkers() {
@@ -77,8 +74,8 @@ public class ZeebeWorkers {
 
                     exchange.setProperty(INTERNAL_ID,instanceKey);
                     exchange.setProperty(DELIVERY_MESSAGE,variables.get(MESSAGE_TO_SEND));
-                    variables.put(RETRIES,retries);
-                    variables.put(TIMER,timer);
+                    variables.put(RETRIES, zeebeProperties.worker().retries());
+                    variables.put(TIMER, zeebeProperties.worker().timer());
 
                     String mobile = exchange.getProperty(MOBILE_NUMBER).toString();
                     Long internalId = Long.parseLong(exchange.getProperty(INTERNAL_ID).toString());
@@ -88,7 +85,7 @@ public class ZeebeWorkers {
                     List<OutboundMessages> payload = new ArrayList<OutboundMessages>();
                     payload.add(outboundMessages);
 
-                    smsApiResource.sendShortMessagesToProvider(tenantIdValue,tenantAppKeyValue,"zeebe",payload);
+                    smsApiResource.sendShortMessagesToProvider(operationsConfig.tenantidvalue(),operationsConfig.tenantappvalue(),"zeebe",payload);
 
                         client.newCompleteCommand(job.getKey()).variables(variables)
                                 .send()
@@ -117,7 +114,7 @@ public class ZeebeWorkers {
                             List<Long> payload = new ArrayList<Long>();
                             payload.add(internalId);
                             //Getting delivery status of the message form the provider.
-                            ResponseEntity<Collection<DeliveryStatusData>> data = smsApiResource.getDeliveryStatus(tenantIdValue, tenantAppKeyValue, "zeebe", payload);
+                            ResponseEntity<Collection<DeliveryStatusData>> data = smsApiResource.getDeliveryStatus(operationsConfig.tenantidvalue(), operationsConfig.tenantappvalue(), "zeebe", payload);
 
                             fetchAndPublishDeliveryStatus(data,exchange);
                         }
@@ -136,7 +133,7 @@ public class ZeebeWorkers {
                         zeebeClient.newPublishMessageCommand()
                                 .messageName(CALLBACK_MESSAGE)
                                 .correlationKey(id)
-                                .timeToLive(Duration.ofMillis(timeToLive))
+                                .timeToLive(Duration.ofMillis(zeebeProperties.client().ttl()))
                                 .variables(newVariables)
                                 .send()
                                 .join();
@@ -206,7 +203,7 @@ public class ZeebeWorkers {
                 .messageName(CALLBACK_MESSAGE)
                 .correlationKey(id)
                 .variables(newVariables)
-                .timeToLive(Duration.ofMillis(timeToLive))
+                .timeToLive(Duration.ofMillis(zeebeProperties.client().ttl()))
                 .send()
                 .join();
     }

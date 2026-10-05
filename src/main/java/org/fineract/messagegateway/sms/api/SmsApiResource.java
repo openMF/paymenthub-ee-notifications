@@ -117,7 +117,7 @@ public class SmsApiResource {
 					Collection<DeliveryStatusData> messageDeliveryStatus = this.smsMessageService.getDeliveryStatus(tenantId, appKey, id);
 					deliveryStatus = messageDeliveryStatus;
 				} catch (ProviderNotDefinedException e) {
-					e.printStackTrace();
+					logger.error("no provider defined for message {}", deliveryStatusData.getId(), e);
 				}
 			}
 		}

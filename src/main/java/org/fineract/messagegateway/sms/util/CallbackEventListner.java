@@ -7,7 +7,7 @@ import org.fineract.messagegateway.sms.domain.OutboundMessages;
 import org.fineract.messagegateway.sms.service.SMSMessageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
+import org.mifos.connector.notification.config.properties.CallbackConfigProperties;
 import org.springframework.context.ApplicationListener;
 import org.springframework.stereotype.Component;
 
@@ -16,15 +16,6 @@ import java.util.Collection;
 @Component
 public class CallbackEventListner implements ApplicationListener<CallbackEvent> {
 
-    @Value("${callbackconfig.host}")
-    private String address ;
-
-    @Value("${callbackconfig.protocol}")
-    private String protocol ;
-
-    @Value("${callbackconfig.port}")
-    private int port ;
-
     private static final Logger logger = LoggerFactory.getLogger(CallbackEventListner.class);
 
     private SMSMessageService smsMessageService;
@@ -32,8 +23,11 @@ public class CallbackEventListner implements ApplicationListener<CallbackEvent> 
     public MediaType JSON = MediaType.parse("application/json; charset=utf-8");
     OkHttpClient client = new OkHttpClient();
 
-    public CallbackEventListner(SMSMessageService smsMessageService) {
+    private final CallbackConfigProperties callbackConfig;
+
+    public CallbackEventListner(SMSMessageService smsMessageService, CallbackConfigProperties callbackConfig) {
         this.smsMessageService = smsMessageService;
+        this.callbackConfig = callbackConfig;
     }
 
     String post(String url, String json) throws IOException {
@@ -54,11 +48,11 @@ public class CallbackEventListner implements ApplicationListener<CallbackEvent> 
         Collection<DeliveryStatusData> deliveryStatus = this.smsMessageService.getDeliveryCallbackStatus
                 (message.getExternalId());
         String json = new Gson().toJson( deliveryStatus);
-        String url=(String.format("%s://%s:%d/sms/callback/", protocol, address, port));
+        String url=(String.format("%s://%s:%d/sms/callback/", callbackConfig.protocol(), callbackConfig.host(), callbackConfig.port()));
         try {
             post(url,json);
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.error("failed to post the delivery callback to {}", url, e);
         }
         logger.debug("From application event "+ url + " " + json);
     }

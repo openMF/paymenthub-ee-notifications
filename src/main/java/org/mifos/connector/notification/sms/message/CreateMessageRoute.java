@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.mifos.connector.notification.config.properties.ZeebeProperties;
 import org.springframework.stereotype.Component;
 
 import java.io.StringWriter;
@@ -24,6 +25,12 @@ import static org.mifos.connector.notification.zeebe.ZeebeVariables.*;
 @Component
 public class CreateMessageRoute extends RouteBuilder {
 
+    private final ZeebeProperties zeebeProperties;
+
+    public CreateMessageRoute(ZeebeProperties zeebeProperties) {
+        this.zeebeProperties = zeebeProperties;
+    }
+
     @Autowired
     private ProviderConfig providerConfig;
 
@@ -35,9 +42,6 @@ public class CreateMessageRoute extends RouteBuilder {
     private TemplateConfig templateConfig;
     @Autowired
     private TemplateDefaultConfig templateDefaultConfig;
-
-    @Value("${zeebe.client.ttl}")
-    private int timeToLive;
 
     private Logger logger = LoggerFactory.getLogger(this.getClass());
 

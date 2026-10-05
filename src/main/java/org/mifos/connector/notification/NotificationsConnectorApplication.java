@@ -8,6 +8,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.fineract.messagegateway.configuration.MessageGatewayConfiguration;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.boot.autoconfigure.gson.GsonAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
@@ -17,6 +18,7 @@ import org.springframework.context.annotation.Import;
 // imported explicitly. GsonAutoConfiguration stays excluded, as it was in the
 // gateway's own configuration class.
 @SpringBootApplication(exclude = GsonAutoConfiguration.class)
+@ConfigurationPropertiesScan("org.mifos.connector.notification.config.properties")
 @Import(MessageGatewayConfiguration.class)
 public class NotificationsConnectorApplication {
 
