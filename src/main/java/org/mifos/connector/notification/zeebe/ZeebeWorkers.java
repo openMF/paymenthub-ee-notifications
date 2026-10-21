@@ -77,6 +77,7 @@ public class ZeebeWorkers {
                     producerTemplate.send("direct:create-success-messages", exchange);
                     client.newCompleteCommand(job.getKey())
                             .send()
+                            .join()
                     ;
                 })
                 .name("transaction_success")
