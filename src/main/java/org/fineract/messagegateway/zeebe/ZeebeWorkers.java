@@ -5,6 +5,8 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import io.camunda.zeebe.client.ZeebeClient;
+import io.camunda.zeebe.client.api.worker.JobClient;
+import io.camunda.zeebe.client.api.response.ActivatedJob;
 
 import org.apache.camel.CamelContext;
 import org.apache.camel.Exchange;
@@ -62,36 +64,7 @@ public class ZeebeWorkers {
     public void setupWorkers() {
         zeebeClient.newWorker()
                 .jobType("mg_send_message")
-                .handler((client, job) -> {
-                    logger.info("Job '{}' started from process '{}' with key {}", job.getType(), job.getBpmnProcessId(), job.getKey());
-                    String instanceKey = String.valueOf(job.getProcessInstanceKey());
-                    Map<String, Object> variables = job.getVariablesAsMap();
-                    Exchange exchange = new DefaultExchange(camelContext);
-
-                    exchange.setProperty(MOBILE_NUMBER,variables.get(PHONE_NUMBER));
-
-                    exchange.setProperty(CORRELATION_ID, instanceKey);
-
-                    exchange.setProperty(INTERNAL_ID,instanceKey);
-                    exchange.setProperty(DELIVERY_MESSAGE,variables.get(MESSAGE_TO_SEND));
-                    variables.put(RETRIES, zeebeProperties.worker().retries());
-                    variables.put(TIMER, zeebeProperties.worker().timer());
-
-                    String mobile = exchange.getProperty(MOBILE_NUMBER).toString();
-                    Long internalId = Long.parseLong(exchange.getProperty(INTERNAL_ID).toString());
-                    Long providerId = providerConfig.getProviderConfig();
-                    OutboundMessages outboundMessages = new OutboundMessages(null,internalId,null,null,null, SmsMessageStatusType.PENDING,null,null,mobile,exchange.getProperty(DELIVERY_MESSAGE).toString(),providerId);
-
-                    List<OutboundMessages> payload = new ArrayList<OutboundMessages>();
-                    payload.add(outboundMessages);
-
-                    smsApiResource.sendShortMessagesToProvider(operationsConfig.tenantidvalue(),operationsConfig.tenantappvalue(),"zeebe",payload);
-
-                        client.newCompleteCommand(job.getKey()).variables(variables)
-                                .send()
-                                .join()
-                        ;
-                })
+                .handler(this::sendMessage)
                 .name("mg_send_message")
                 .maxJobsActive(workerMaxJobs)
                 .open();
@@ -148,6 +121,46 @@ public class ZeebeWorkers {
                 .open();
 
     }
+    /**
+     * Queues the job's message with the provider. A missing phone number or message used to
+     * throw a NullPointerException inside the handler; it now fails the job without retries,
+     * since retrying cannot supply the variable. A rejected send fails the job too, instead
+     * of being completed as if the message had been queued.
+     */
+    void sendMessage(JobClient client, ActivatedJob job) {
+        logger.info("Job '{}' started from process '{}' with key {}", job.getType(), job.getBpmnProcessId(), job.getKey());
+        Map<String, Object> variables = job.getVariablesAsMap();
+        for (String required : List.of(PHONE_NUMBER, MESSAGE_TO_SEND)) {
+            if (variables.get(required) == null) {
+                logger.error("Job '{}' with key {}: missing job variable {}", job.getType(), job.getKey(), required);
+                client.newFailCommand(job.getKey()).retries(0).errorMessage("Missing job variable " + required).send().join();
+                return;
+            }
+        }
+        String instanceKey = String.valueOf(job.getProcessInstanceKey());
+        variables.put(RETRIES, zeebeProperties.worker().retries());
+        variables.put(TIMER, zeebeProperties.worker().timer());
+
+        OutboundMessages outboundMessages = new OutboundMessages(null, Long.parseLong(instanceKey), null, null, null,
+                SmsMessageStatusType.PENDING, null, null, variables.get(PHONE_NUMBER).toString(),
+                variables.get(MESSAGE_TO_SEND).toString(), providerConfig.getProviderConfig());
+        List<OutboundMessages> payload = new ArrayList<OutboundMessages>();
+        payload.add(outboundMessages);
+
+        ResponseEntity<Void> response = smsApiResource.sendShortMessagesToProvider(operationsConfig.tenantidvalue(),
+                operationsConfig.tenantappvalue(), "zeebe", payload);
+        if (response == null || !response.getStatusCode().is2xxSuccessful()) {
+            String status = response == null ? "no response" : response.getStatusCode().toString();
+            logger.error("Job '{}' with key {}: the message was not queued ({})", job.getType(), job.getKey(), status);
+            client.newFailCommand(job.getKey()).retries(Math.max(job.getRetries() - 1, 0))
+                    .errorMessage("Message not queued: " + status).send().join();
+            return;
+        }
+        client.newCompleteCommand(job.getKey()).variables(variables)
+                .send()
+                .join();
+    }
+
     public void fetchAndPublishDeliveryStatus(ResponseEntity<Collection<DeliveryStatusData>> data,Exchange exchange){
         String id = exchange.getProperty(CORRELATION_ID, String.class);
         if (!data.getBody().isEmpty() && !data.getBody().equals(null)){

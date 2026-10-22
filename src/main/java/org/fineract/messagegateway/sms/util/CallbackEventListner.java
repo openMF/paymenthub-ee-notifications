@@ -1,5 +1,6 @@
 package org.fineract.messagegateway.sms.util;
 
+import org.springframework.scheduling.annotation.Async;
 import com.google.gson.Gson;
 import com.squareup.okhttp.*;
 import org.fineract.messagegateway.sms.data.DeliveryStatusData;
@@ -40,6 +41,8 @@ public class CallbackEventListner implements ApplicationListener<CallbackEvent> 
         Response response = client.newCall(request).execute();
         return response.body().string();
     }
+    // Posts to the callback URL, so it runs off the publishing (provider callback) thread.
+    @Async
     @Override
     public void onApplicationEvent(CallbackEvent event) {
         logger.info("From application event method in callback listener");

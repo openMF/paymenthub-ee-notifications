@@ -67,7 +67,7 @@ public class SecurityService {
     public String generateApiKey(final String tenantId) {
     	Tenant tenant = this.tenantRepository.findByTenantId(tenantId) ;
     	if(tenant != null) {
-    		org.fineract.messagegateway.exception.SecurityException.tenantAlreadyExisits(tenantId) ;
+    		throw org.fineract.messagegateway.exception.SecurityException.tenantAlreadyExisits(tenantId) ;
     	}
     	
         final String randomKey = UUID.randomUUID().toString();

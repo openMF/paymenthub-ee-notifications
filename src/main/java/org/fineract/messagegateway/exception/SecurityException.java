@@ -18,6 +18,11 @@
  */
 package org.fineract.messagegateway.exception;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.ResponseStatus;
+
+// Raised when a tenant is registered twice; answered 409 rather than 500.
+@ResponseStatus(HttpStatus.CONFLICT)
 public class SecurityException extends RuntimeException {
 
 	private SecurityException(final String msg) {

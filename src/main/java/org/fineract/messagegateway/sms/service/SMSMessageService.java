@@ -21,6 +21,9 @@ package org.fineract.messagegateway.sms.service;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Collection;
+import java.util.List;
+import java.util.Collections;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -133,13 +136,17 @@ public class SMSMessageService {
 
 	public Collection<DeliveryStatusData> getDeliveryStatus(final String tenantId, final String tenantAppKey, final Collection<Long> internalIds) {
 		Tenant tenant = this.securityService.authenticate(tenantId, tenantAppKey) ;
+		if (internalIds == null || internalIds.isEmpty()) {
+			// "in ()" is not valid SQL; there is nothing to look up.
+			return new ArrayList<>() ;
+		}
 		DeliveryStatusDataRowMapper mapper = new DeliveryStatusDataRowMapper() ;
-		String internaIdString = internalIds.toString() ;
-		internaIdString = internaIdString.replace("[", "(") ;
-		internaIdString = internaIdString.replace("]", ")") ;
-		String query = mapper.schema() + " where m.tenant_id=?"+" and m.internal_id in " +internaIdString;
-		Collection<DeliveryStatusData> datas = this.jdbcTemplate.query(query, mapper, new Object[] {tenant.getId()}) ;
-		return datas ;
+		String placeholders = String.join(",", Collections.nCopies(internalIds.size(), "?")) ;
+		String query = mapper.schema() + " where m.tenant_id=? and m.internal_id in (" + placeholders + ")" ;
+		List<Object> args = new ArrayList<>() ;
+		args.add(tenant.getId()) ;
+		args.addAll(internalIds) ;
+		return this.jdbcTemplate.query(query, mapper, args.toArray()) ;
 	}
 
 	public Collection<DeliveryStatusData>  getDeliveryCallbackStatus( String externalId) {

@@ -24,11 +24,9 @@ import org.fineract.messagegateway.sms.domain.SMSBridgeConfig;
 import org.fineract.messagegateway.sms.domain.OutboundMessages;
 import org.fineract.messagegateway.tenants.domain.Tenant;
 import org.springframework.boot.autoconfigure.domain.EntityScan;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.event.SimpleApplicationEventMulticaster;
-import org.springframework.core.task.SimpleAsyncTaskExecutor;
+import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
 @Configuration
@@ -47,16 +45,13 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 @ComponentScan(basePackages = {
         "org.fineract.messagegateway.*"
 })
+// No custom applicationEventMulticaster: an asynchronous one also delivered Spring's
+// own ContextRefreshedEvent on another thread, and Camel then started with no routes.
+// The one listener that should run in the background, CallbackEventListner, is @Async.
+@EnableAsync
 public class MessageGatewayConfiguration {
 
     public MessageGatewayConfiguration() {
         super();
-    }
-
-    @Bean
-    public SimpleApplicationEventMulticaster applicationEventMulticaster() {
-        final SimpleApplicationEventMulticaster multicaster = new SimpleApplicationEventMulticaster();
-        multicaster.setTaskExecutor(new SimpleAsyncTaskExecutor());
-        return multicaster;
     }
 }
